@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pixtrick"
+version = "0.1.0"
+description = "Free-to-use photo editing software"
+authors = [{name = "Łukasz Bielaszewski", email = "lukaszbielaszewskibiz@gmail.com"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "PySide6>=6.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "black>=22.0",
+    "flake8>=5.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
