@@ -9,16 +9,16 @@ description = "Free-to-use photo editing software"
 authors = [{name = "Łukasz Bielaszewski", email = "lukaszbielaszewskibiz@gmail.com"}]
 license = {text = "MIT"}
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "PySide6>=6.4.0",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=7.0",
-    "black>=22.0",
-    "flake8>=5.0",
+    "pytest>=8.4.1",
+    "black>=25.1.0",
+    "flake8>=7.3.0",
 ]
 
 [tool.setuptools.packages.find]

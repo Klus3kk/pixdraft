@@ -1,0 +1,16 @@
+[package]
+name = "pixtrick-engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "pixtrick_engine"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.25.1", features = ["extension-module"] }
+image = { version = "0.25.6", features = ["png", "jpeg", "tiff", "webp"] }
+opencv = { version = "0.95.1", default-features = false, features = ["imgproc"] }
+rayon = "1.8"  # Parallel processing
+ndarray = "0.16.1"  # Efficient arrays
+num-traits = "0.2"
