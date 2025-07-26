@@ -1,0 +1,232 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust-tests:
+    name: Rust Engine Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libopencv-dev \
+          clang \
+          libclang-dev \
+          pkg-config
+    
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          src/engine/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('src/engine/Cargo.lock') }}
+    
+    - name: Check Rust formatting
+      run: |
+        cd src/engine
+        cargo fmt --all -- --check
+    
+    - name: Run Clippy
+      run: |
+        cd src/engine
+        cargo clippy --all-targets --all-features -- -D warnings
+    
+    - name: Run Rust tests
+      run: |
+        cd src/engine
+        cargo test --verbose
+        
+  python-tests:
+    name: Python Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        exclude:
+          - os: windows-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.9'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          libopencv-dev \
+          clang \
+          libclang-dev \
+          pkg-config \
+          qt6-base-dev \
+          qt6-tools-dev \
+          qt6-tools-dev-tools
+    
+    - name: Install Windows dependencies
+      if: runner.os == 'Windows'
+      run: |
+        # Use vcpkg for OpenCV on Windows
+        vcpkg install opencv[core,imgproc]:x64-windows
+        echo "CMAKE_TOOLCHAIN_FILE=C:/vcpkg/scripts/buildsystems/vcpkg.cmake" >> $env:GITHUB_ENV
+        echo "VCPKG_TARGET_TRIPLET=x64-windows" >> $env:GITHUB_ENV
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+    
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install maturin pytest black flake8
+        pip install Pillow  # For image testing
+    
+    - name: Install project in development mode
+      run: |
+        pip install -e .
+        cd src/engine
+        maturin develop
+    
+    - name: Run Python linting
+      run: |
+        black --check .
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Run Python tests
+      run: |
+        python test_engine.py
+    
+    - name: Run pytest 
+      run: |
+        if [ -d "tests" ]; then pytest tests/; fi
+      shell: bash
+
+  build-packages:
+    name: Build Packages
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install system dependencies (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopencv-dev clang libclang-dev pkg-config
+    
+    - name: Install build tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install maturin build twine
+    
+    - name: Build wheel
+      run: |
+        cd src/engine
+        maturin build --release
+    
+    - name: Upload wheel artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: wheels-${{ matrix.os }}
+        path: src/engine/target/wheels/*.whl
+
+  # Performance Benchmarks
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopencv-dev clang libclang-dev pkg-config
+        pip install maturin Pillow
+    
+    - name: Build engine
+      run: |
+        cd src/engine
+        maturin develop --release
+    
+    - name: Run benchmarks
+      run: |
+        python test_engine.py > benchmark_results.txt
+        echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        cat benchmark_results.txt >> $GITHUB_STEP_SUMMARY
+        echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+        
+  security:
+    name: Security Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run security audit
+      run: |
+        cd src/engine
+        cargo audit
+    
+    - name: Check for unsafe code
+      run: |
+        cd src/engine
+        ! grep -r "unsafe" src/ || (echo "Unsafe code detected!" && exit 1)
