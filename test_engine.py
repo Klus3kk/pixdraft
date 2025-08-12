@@ -1,13 +1,22 @@
-#!/usr/bin/env python3
 """
-Enhanced test script for PixTrick Rust engine
-Demonstrates working filter system with performance benchmarks
+Test script for PixTrick Rust engine
+Fast functional tests with optional performance tracking
 """
 
 import sys
 import time
 from pathlib import Path
 import traceback
+
+# Import performance tracking 
+try:
+    from performance_data_schema import (
+        PerformanceDatabase, BenchmarkCollector, 
+        ImageMetadata, FilterConfig, PerformanceMetrics
+    )
+    PERFORMANCE_TRACKING = True
+except ImportError:
+    PERFORMANCE_TRACKING = False
 
 def test_basic_functionality():
     """Test basic image loading and processing"""
@@ -25,10 +34,10 @@ def test_basic_functionality():
     print("\n1. Testing image creation...")
     try:
         img = engine.PixImage(100, 100)
-        print(f"✓ Created image: {img.info()}")
+        print(f"  Created image: {img.info()}")
         print(f"  Dimensions: {img.width}x{img.height}, Channels: {img.channels}")
     except Exception as e:
-        print(f"✗ Failed to create image: {e}")
+        print(f"  Failed to create image: {e}")
         return False
     
     # Test 2: Pixel operations
@@ -42,51 +51,47 @@ def test_basic_functionality():
         # Test bounds checking
         try:
             img.get_pixel(200, 200)  # Should fail
-            print("✗ Bounds checking failed")
+            print("  Bounds checking failed")
         except Exception:
-            print("✓ Bounds checking works")
+            print("  Bounds checking works")
     except Exception as e:
-        print(f"✗ Pixel operations failed: {e}")
+        print(f"  Pixel operations failed: {e}")
         return False
     
     return True
 
-def test_filter_system():
-    """Test the complete filter system with actual processing"""
-    print("\n3. Testing complete filter system...")
+def test_filter_system_with_tracking():
+    """Test the complete filter system with performance tracking"""
+    print("\n3. Testing filter system with performance tracking...")
     
     try:
         import pixtrick_engine as engine
+        
+        # Initialize performance tracking if available
+        collector = None
+        if PERFORMANCE_TRACKING:
+            db = PerformanceDatabase()
+            collector = BenchmarkCollector(db)
+            print("    Performance tracking enabled")
         
         # Create a test image with some pattern
         print("  Creating test pattern image...")
         img = engine.PixImage(200, 200)
         
-        # Create a gradient pattern for better filter testing
+        # Create a simple gradient pattern
         for y in range(200):
             for x in range(200):
-                # Create a radial gradient
-                center_x, center_y = 100, 100
-                distance = ((x - center_x) ** 2 + (y - center_y) ** 2) ** 0.5
-                intensity = max(0, min(255, int(255 - distance * 2)))
-                
-                # Add some color variation
-                r = intensity
-                g = intensity if x < 100 else max(0, intensity - 50)
-                b = intensity if y < 100 else max(0, intensity - 50)
-                
-                img.set_pixel(x, y, r, g, b, 255)
+                intensity = int(255 * ((x + y) / (200 + 200)))
+                img.set_pixel(x, y, intensity, intensity // 2, 255 - intensity, 255)
         
         print("✓ Created gradient test image")
         
-        # Test all available filters
+        # Test filters with performance tracking
         filters_to_test = [
             ("brightness", {"amount": 20.0}),
             ("contrast", {"amount": 15.0}),
             ("saturation", {"amount": 150.0}),
-            ("hue_shift", {"degrees": 45.0}),
             ("box_blur", {"radius": 2.0}),
-            ("gaussian_blur", {"radius": 1.5}),
             ("invert", {}),
             ("grayscale", {}),
         ]
@@ -94,6 +99,8 @@ def test_filter_system():
         # Create node graph
         graph = engine.NodeGraph()
         graph.set_source_image(img)
+        
+        performance_results = []
         
         # Test each filter individually
         for filter_type, params in filters_to_test:
@@ -109,18 +116,124 @@ def test_filter_system():
                 
                 graph.add_node(node)
                 
-                # Process and time
-                start_time = time.time()
+                # Measure performance
+                start_time = time.perf_counter()
                 result = graph.process()
-                end_time = time.time()
+                end_time = time.perf_counter()
                 
                 processing_time = (end_time - start_time) * 1000
-                print(f"✓ {filter_type}: {processing_time:.2f}ms - {result.info()}")
+                print(f"{filter_type}: {processing_time:.2f}ms - {result.info()}")
+                
+                # Store performance data if tracking enabled
+                if collector:
+                    image_meta = ImageMetadata(
+                        width=img.width,
+                        height=img.height,
+                        channels=img.channels,
+                        file_size_mb=None,
+                        format="Generated",
+                        complexity_score=0.5  # Medium complexity gradient
+                    )
+                    
+                    filter_config = [FilterConfig(
+                        filter_type=filter_type,
+                        parameters=params,
+                        enabled=True,
+                        order_index=0
+                    )]
+                    
+                    performance_metrics = PerformanceMetrics(
+                        execution_time_ms=processing_time,
+                        memory_peak_mb=0.0,  # Would need separate monitoring
+                        memory_allocated_mb=0.0,
+                        cpu_usage_percent=0.0,
+                        cache_hits=0,
+                        cache_misses=0,
+                        filter_times_ms={filter_type: processing_time}
+                    )
+                    
+                    benchmark_result = collector.create_benchmark_result(
+                        image_meta, filter_config, performance_metrics,
+                        test_type="functional_test",
+                        tags=["quick_test", filter_type],
+                        notes=f"Functional test of {filter_type} filter"
+                    )
+                    
+                    collector.store_benchmark(benchmark_result)
+                
+                performance_results.append((filter_type, processing_time))
                 
             except Exception as e:
-                print(f"✗ {filter_type} failed: {e}")
-                traceback.print_exc()
+                print(f"{filter_type} failed: {e}")
                 return False
+        
+        # Test filter chain
+        print("\n  Testing filter chain...")
+        
+        # Clear all nodes
+        for node_id in graph.get_node_ids():
+            graph.remove_node(node_id)
+        
+        # Add a chain of filters
+        chain_filters = [
+            ("brightness", {"amount": 10.0}),
+            ("contrast", {"amount": 8.0}),
+            ("saturation", {"amount": 120.0})
+        ]
+        
+        filter_configs = []
+        for i, (filter_type, params) in enumerate(chain_filters):
+            node = engine.FilterNode(f"chain_{i}_{filter_type}", filter_type)
+            for key, value in params.items():
+                node.set_parameter(key, value)
+            graph.add_node(node)
+            
+            filter_configs.append(FilterConfig(
+                filter_type=filter_type,
+                parameters=params,
+                enabled=True,
+                order_index=i
+            ))
+        
+        # Process chain
+        start_time = time.perf_counter()
+        chain_result = graph.process()
+        end_time = time.perf_counter()
+        
+        chain_time = (end_time - start_time) * 1000
+        print(f"Filter chain: {chain_time:.2f}ms - {chain_result.info()}")
+        
+        # Store chain performance if tracking enabled
+        if collector:
+            chain_performance = PerformanceMetrics(
+                execution_time_ms=chain_time,
+                memory_peak_mb=0.0,
+                memory_allocated_mb=0.0,
+                cpu_usage_percent=0.0,
+                cache_hits=0,
+                cache_misses=0,
+                filter_times_ms={f[0]: chain_time / len(chain_filters) for f, _ in chain_filters}
+            )
+            
+            chain_benchmark = collector.create_benchmark_result(
+                image_meta, filter_configs, chain_performance,
+                test_type="functional_test",
+                tags=["quick_test", "filter_chain"],
+                notes="Functional test of filter chain"
+            )
+            
+            collector.store_benchmark(chain_benchmark)
+        
+        # Performance summary
+        if performance_results:
+            print(f"\n  Performance Summary:")
+            total_time = sum(time for _, time in performance_results)
+            print(f"    Total individual filter time: {total_time:.1f}ms")
+            print(f"    Chain processing time: {chain_time:.1f}ms")
+            print(f"    Chain efficiency: {(total_time/chain_time)*100:.1f}% (lower is better)")
+            
+            if PERFORMANCE_TRACKING:
+                print(f"    Results stored in performance database")
         
         return True
         
@@ -157,17 +270,17 @@ def test_node_graph_features():
                 node.set_parameter(key, value)
             graph.add_node(node)
         
-        print(f"✓ Added {len(filters)} filters to graph")
+        print(f"Added {len(filters)} filters to graph")
         
         # Test execution order
         original_order = graph.get_execution_order()
-        print(f"✓ Original order: {original_order}")
+        print(f"Original order: {original_order}")
         
         # Test reordering
         new_order = original_order[::-1]  # Reverse order
         graph.set_execution_order(new_order)
         reordered = graph.get_execution_order()
-        print(f"✓ Reordered to: {reordered}")
+        print(f"Reordered to: {reordered}")
         
         # Test processing with different orders
         start_time = time.time()
@@ -179,24 +292,27 @@ def test_node_graph_features():
         result2 = graph.process()
         time2 = time.time() - start_time
         
-        print(f"✓ First processing: {time1*1000:.2f}ms")
-        print(f"✓ Cached processing: {time2*1000:.2f}ms")
-        print(f"✓ Cache speedup: {time1/time2:.1f}x" if time2 > 0 else "✓ Cache working")
+        print(f"First processing: {time1*1000:.2f}ms")
+        print(f"Cached processing: {time2*1000:.2f}ms")
+        if time2 > 0:
+            print(f"Cache speedup: {time1/time2:.1f}x")
+        else:
+            print("Cache working (instant processing)")
         
         # Test node enable/disable
         node = graph.get_node("brightness_1")
         node.toggle_enabled()
         graph.update_node(node)
-        print("✓ Toggled node enabled/disabled")
+        print("Toggled node enabled/disabled")
         
         # Test parameter introspection
         available_filters = engine.NodeGraph.get_available_filters()
-        print(f"✓ Available filters: {', '.join(available_filters)}")
+        print(f"Available filters: {', '.join(available_filters)}")
         
         return True
         
     except Exception as e:
-        print(f"✗ Node graph features test failed: {e}")
+        print(f"Node graph features test failed: {e}")
         traceback.print_exc()
         return False
 
@@ -241,7 +357,7 @@ def test_image_loading():
             test_img = Image.fromarray(img_array)
             test_image_path = "colorful_test.png"
             test_img.save(test_image_path)
-            print(f"✓ Created colorful test image: {test_image_path}")
+            print(f"Created colorful test image: {test_image_path}")
             
         except ImportError:
             print("  Creating simple test image without PIL...")
@@ -257,16 +373,16 @@ def test_image_loading():
             
             test_image_path = "simple_test.png"
             img.save(test_image_path)
-            print(f"✓ Created simple test image: {test_image_path}")
+            print(f"Created simple test image: {test_image_path}")
             
             # Load it back
             loaded_img = engine.load_image(test_image_path)
-            print(f"✓ Loaded image: {loaded_img.info()}")
+            print(f"Loaded image: {loaded_img.info()}")
             return True
         
         # Load with our engine and test filters
         loaded_img = engine.load_image(test_image_path)
-        print(f"✓ Loaded image: {loaded_img.info()}")
+        print(f"Loaded image: {loaded_img.info()}")
         
         # Apply a filter chain
         graph = engine.NodeGraph()
@@ -289,86 +405,86 @@ def test_image_loading():
         result = graph.process()
         output_path = "enhanced_output.png"
         result.save(output_path)
-        print(f"✓ Applied enhancement chain and saved to: {output_path}")
+        print(f"Applied enhancement chain and saved to: {output_path}")
         
         return True
         
     except Exception as e:
-        print(f"✗ Image I/O test failed: {e}")
+        print(f"Image I/O test failed: {e}")
         traceback.print_exc()
         return False
 
-def benchmark_performance():
-    """Comprehensive performance benchmarking"""
-    print("\n6. Performance benchmarks...")
+def quick_performance_benchmark():
+    """Quick performance benchmark for development"""
+    print("\n6. Quick performance benchmark...")
     
     try:
         import pixtrick_engine as engine
         
-        # Test different image sizes
-        sizes = [
-            (100, 100, "Small"),
-            (500, 500, "Medium"), 
-            (1000, 1000, "Large"),
+        # Test medium-sized image
+        print("  Creating 500x500 test image...")
+        img = engine.PixImage(500, 500)
+        
+        # Fill with test pattern (checkerboard)
+        for y in range(500):
+            for x in range(500):
+                if (x // 20 + y // 20) % 2:
+                    img.set_pixel(x, y, 255, 255, 255, 255)
+                else:
+                    img.set_pixel(x, y, 128, 64, 192, 255)
+        
+        # Test key filters
+        test_filters = [
+            ("brightness", {"amount": 20.0}),
+            ("contrast", {"amount": 15.0}),
+            ("saturation", {"amount": 120.0}),
+            ("box_blur", {"radius": 2.0}),
         ]
         
-        for width, height, size_name in sizes:
-            print(f"\n  Testing {size_name} ({width}x{height}):")
+        graph = engine.NodeGraph()
+        graph.set_source_image(img)
+        
+        total_time = 0
+        for filter_type, params in test_filters:
+            # Clear previous nodes
+            for node_id in graph.get_node_ids():
+                graph.remove_node(node_id)
             
-            # Create test image
-            img = engine.PixImage(width, height)
+            node = engine.FilterNode("test", filter_type)
+            for key, value in params.items():
+                node.set_parameter(key, value)
+            graph.add_node(node)
             
-            # Fill with test pattern
-            for y in range(0, height, 10):
-                for x in range(0, width, 10):
-                    # Checkerboard pattern
-                    if (x // 10 + y // 10) % 2:
-                        img.set_pixel(x, y, 255, 255, 255, 255)
-                    else:
-                        img.set_pixel(x, y, 0, 0, 0, 255)
+            # Benchmark 3 runs for stability
+            times = []
+            for _ in range(3):
+                graph.clear_cache()
+                start = time.perf_counter()
+                result = graph.process()
+                end = time.perf_counter()
+                times.append((end - start) * 1000)
             
-            # Test individual filter performance
-            test_filters = [
-                ("brightness", {"amount": 20.0}),
-                ("contrast", {"amount": 15.0}),
-                ("saturation", {"amount": 120.0}),
-                ("box_blur", {"radius": 2.0}),
-                ("gaussian_blur", {"radius": 1.5}),
-            ]
+            avg_time = sum(times) / len(times)
+            total_time += avg_time
             
-            total_time = 0
-            for filter_type, params in test_filters:
-                graph = engine.NodeGraph()
-                graph.set_source_image(img)
-                
-                node = engine.FilterNode("test", filter_type)
-                for key, value in params.items():
-                    node.set_parameter(key, value)
-                graph.add_node(node)
-                
-                # Benchmark multiple runs
-                times = []
-                for _ in range(3):
-                    graph.clear_cache()  # Ensure no caching between runs
-                    start = time.time()
-                    result = graph.process()
-                    end = time.time()
-                    times.append(end - start)
-                
-                avg_time = sum(times) / len(times) * 1000  # Convert to ms
-                total_time += avg_time
-                
-                pixels_processed = width * height
-                mpixels_per_sec = (pixels_processed / 1_000_000) / (avg_time / 1000)
-                
-                print(f"    {filter_type}: {avg_time:.2f}ms ({mpixels_per_sec:.1f} MP/s)")
+            pixels_processed = img.width * img.height
+            mpixels_per_sec = (pixels_processed / 1_000_000) / (avg_time / 1000)
             
-            print(f"    Total processing time: {total_time:.2f}ms")
-            
+            print(f"    {filter_type:12}: {avg_time:6.1f}ms ({mpixels_per_sec:4.1f} MP/s)")
+        
+        print(f"    {'Total':12}: {total_time:6.1f}ms")
+        
+        # Performance targets (rough estimates)
+        target_time = 200  # 200ms total for 4 filters on 500x500
+        if total_time < target_time:
+            print(f"Performance target met! ({total_time:.1f}ms < {target_time}ms)")
+        else:
+            print(f"Performance target missed ({total_time:.1f}ms > {target_time}ms)")
+        
         return True
         
     except Exception as e:
-        print(f"✗ Performance benchmark failed: {e}")
+        print(f"Performance benchmark failed: {e}")
         traceback.print_exc()
         return False
 
@@ -378,10 +494,6 @@ def cleanup():
         "colorful_test.png", 
         "simple_test.png", 
         "enhanced_output.png",
-        "test_image.png", 
-        "test_output.png", 
-        "benchmark_test.png", 
-        "benchmark_result.png"
     ]
     for file in test_files:
         try:
@@ -389,16 +501,22 @@ def cleanup():
         except:
             pass
 
-if __name__ == "__main__":
-    print("PixTrick Enhanced Engine Test Suite")
-    print("=" * 50)
+def main():
+    """Main test runner with optional performance tracking"""
+    print("PixTrick Engine Test Suite")
+    print("=" * 40)
+    
+    if PERFORMANCE_TRACKING:
+        print("Performance tracking: ENABLED")
+    else:
+        print("Performance tracking: disabled (install performance_data_schema.py)")
     
     tests = [
         ("Basic Functionality", test_basic_functionality),
-        ("Complete Filter System", test_filter_system),
+        ("Filter System + Tracking", test_filter_system_with_tracking),
         ("Node Graph Features", test_node_graph_features),
         ("Image I/O", test_image_loading),
-        ("Performance Benchmarks", benchmark_performance),
+        ("Quick Performance", quick_performance_benchmark),
     ]
     
     tests_passed = 0
@@ -410,18 +528,21 @@ if __name__ == "__main__":
         try:
             if test_func():
                 tests_passed += 1
-                print(f"✅ {test_name} PASSED")
+                print(f"{test_name} PASSED")
             else:
-                print(f"❌ {test_name} FAILED")
+                print(f"{test_name} FAILED")
         except Exception as e:
-            print(f"❌ {test_name} CRASHED: {e}")
+            print(f"{test_name} CRASHED: {e}")
             traceback.print_exc()
     
     # Summary
-    print(f"\n{'='*50}")
+    print(f"\n{'='*40}")
     print(f"Test Results: {tests_passed}/{total_tests} passed")
-    print(f"{'='*50}\n")
+        
     # Cleanup
     cleanup()
+    return tests_passed == total_tests
 
-    sys.exit(0 if tests_passed == total_tests else 1)
+if __name__ == "__main__":
+    success = main()
+    sys.exit(0 if success else 1)

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 PixTrick ML-Driven Performance Analyzer
 Intelligent benchmarking, trend analysis, and performance optimization
@@ -25,7 +24,7 @@ try:
     ENGINE_AVAILABLE = True
 except ImportError:
     ENGINE_AVAILABLE = False
-    print("⚠️  PixTrick engine not available. Run: cd src/engine && maturin develop")
+    print("PixTrick engine not available. Run: cd src/engine && maturin develop")
 
 class ImageGenerator:
     """Generate test images with different characteristics"""
@@ -170,7 +169,7 @@ class PerformanceBenchmarker:
                 result = graph.process()
                 success = True
             except Exception as e:
-                print(f"❌ Filter {filter_type} failed: {e}")
+                print(f"Filter {filter_type} failed: {e}")
                 success = False
             end_time = time.perf_counter()
             
@@ -243,7 +242,7 @@ class PerformanceBenchmarker:
                 result = graph.process()
                 success = True
             except Exception as e:
-                print(f"❌ Filter chain failed: {e}")
+                print(f"Filter chain failed: {e}")
                 success = False
             end_time = time.perf_counter()
             
@@ -285,10 +284,10 @@ class PerformanceBenchmarker:
         """Run comprehensive benchmarks across different scenarios"""
         
         if not ENGINE_AVAILABLE:
-            print("❌ Cannot run benchmarks without engine")
+            print("Cannot run benchmarks without engine")
             return
         
-        print("🚀 Starting Comprehensive Performance Benchmark Suite")
+        print("Starting Comprehensive Performance Benchmark Suite")
         print("=" * 60)
         
         # Test configurations
@@ -325,10 +324,10 @@ class PerformanceBenchmarker:
         results_summary = []
         
         for width, height, size_name in image_sizes:
-            print(f"\n📏 Testing {size_name} Images ({width}x{height})")
+            print(f"\nTesting {size_name} Images ({width}x{height})")
             
             for pattern in image_patterns:
-                print(f"  🎨 Pattern: {pattern}")
+                print(f"  Pattern: {pattern}")
                 
                 try:
                     # Generate test image
@@ -347,7 +346,7 @@ class PerformanceBenchmarker:
                     # Test single filters
                     for filter_type, params in single_filters:
                         test_count += 1
-                        print(f"    🔧 [{test_count}/{total_tests}] {filter_type}")
+                        print(f"    [{test_count}/{total_tests}] {filter_type}")
                         
                         try:
                             metrics = self.benchmark_single_filter(filter_type, params, img)
@@ -379,13 +378,13 @@ class PerformanceBenchmarker:
                             })
                             
                         except Exception as e:
-                            print(f"      ❌ Failed: {e}")
+                            print(f"      Failed: {e}")
                     
                     # Test filter chains
                     for chain in filter_chains:
                         test_count += 1
                         chain_name = " → ".join([f[0] for f in chain])
-                        print(f"    ⛓️  [{test_count}/{total_tests}] {chain_name}")
+                        print(f"    [{test_count}/{total_tests}] {chain_name}")
                         
                         try:
                             metrics, filter_configs = self.benchmark_filter_chain(chain, img)
@@ -410,12 +409,12 @@ class PerformanceBenchmarker:
                             })
                             
                         except Exception as e:
-                            print(f"      ❌ Failed: {e}")
+                            print(f"      Failed: {e}")
                 
                 except Exception as e:
-                    print(f"    ❌ Failed to create {pattern} image: {e}")
+                    print(f"    Failed to create {pattern} image: {e}")
         
-        print(f"\n✅ Completed {test_count} benchmark tests!")
+        print(f"\nCompleted {test_count} benchmark tests!")
         return results_summary
 
 class PerformanceAnalyzer:
@@ -426,7 +425,7 @@ class PerformanceAnalyzer:
     
     def analyze_performance_trends(self, days: int = 30):
         """Analyze performance trends over time"""
-        print(f"\n📈 Performance Trends (Last {days} days)")
+        print(f"\nPerformance Trends (Last {days} days)")
         print("-" * 40)
         
         trends = self.db.get_performance_trends(days)
@@ -447,14 +446,14 @@ class PerformanceAnalyzer:
             
             if recent_avg < older_avg:
                 improvement = ((older_avg - recent_avg) / older_avg) * 100
-                print(f"🚀 Performance IMPROVED by {improvement:.1f}% recently")
+                print(f"Performance IMPROVED by {improvement:.1f}% recently")
             else:
                 regression = ((recent_avg - older_avg) / older_avg) * 100
-                print(f"⚠️  Performance REGRESSED by {regression:.1f}% recently")
+                print(f"Performance REGRESSED by {regression:.1f}% recently")
     
     def analyze_by_image_characteristics(self):
         """Analyze performance patterns by image characteristics"""
-        print("\n🖼️  Performance by Image Characteristics")
+        print("\nPerformance by Image Characteristics")
         print("-" * 45)
         
         results = self.db.query_results()
@@ -465,7 +464,7 @@ class PerformanceAnalyzer:
         df = pd.DataFrame(results)
         
         # Performance by image size
-        print("\n📏 Performance by Image Size:")
+        print("\nPerformance by Image Size:")
         size_groups = df.groupby(pd.cut(df['img_megapixels'], bins=[0, 1, 4, 10, float('inf')], 
                                        labels=['<1MP', '1-4MP', '4-10MP', '>10MP']))
         
@@ -477,7 +476,7 @@ class PerformanceAnalyzer:
         
         # Performance by complexity
         if 'img_complexity_score' in df.columns and df['img_complexity_score'].notna().any():
-            print("\n🎨 Performance by Image Complexity:")
+            print("\nPerformance by Image Complexity:")
             complexity_groups = df.groupby(pd.cut(df['img_complexity_score'], bins=3, 
                                                  labels=['Low', 'Medium', 'High']))
             
@@ -489,7 +488,7 @@ class PerformanceAnalyzer:
     
     def analyze_filter_performance(self):
         """Analyze individual filter performance"""
-        print("\n🔧 Filter Performance Analysis")
+        print("\nFilter Performance Analysis")
         print("-" * 35)
         
         results = self.db.query_results()
@@ -539,18 +538,18 @@ class PerformanceAnalyzer:
     
     def generate_performance_report(self):
         """Generate a comprehensive performance report"""
-        print("🏆 PixTrick Performance Analysis Report")
+        print("PixTrick Performance Analysis Report")
         print("=" * 50)
         print(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         # Get basic statistics
         results = self.db.query_results()
         if not results:
-            print("\n❌ No benchmark data available!")
+            print("\nNo benchmark data available!")
             print("Run: python performance_analyzer.py --benchmark")
             return
         
-        print(f"\n📊 Dataset Overview:")
+        print(f"\nDataset Overview:")
         print(f"  Total Benchmark Results: {len(results)}")
         
         df = pd.DataFrame(results)
@@ -558,7 +557,7 @@ class PerformanceAnalyzer:
         print(f"  Test Types: {', '.join(df['test_type'].unique())}")
         
         # Performance overview
-        print(f"\n⚡ Performance Overview:")
+        print(f"\nPerformance Overview:")
         print(f"  Average Execution Time: {df['execution_time_ms'].mean():.1f}ms")
         print(f"  Fastest Execution: {df['execution_time_ms'].min():.1f}ms")
         print(f"  Slowest Execution: {df['execution_time_ms'].max():.1f}ms")
@@ -569,7 +568,7 @@ class PerformanceAnalyzer:
         self.analyze_by_image_characteristics()
         self.analyze_filter_performance()
         
-        print(f"\n✅ Report complete! Database: {self.db.db_path}")
+        print(f"\nReport complete! Database: {self.db.db_path}")
 
 def main():
     """Main CLI interface"""
@@ -596,17 +595,17 @@ def main():
     
     try:
         if args.benchmark:
-            print("🚀 Running Benchmark Suite...")
+            print("Running Benchmark Suite...")
             benchmarker.comprehensive_benchmark_suite(save_results=True)
         
         if args.analyze or args.report:
-            print("\n🔍 Analyzing Performance Data...")
+            print("\nAnalyzing Performance Data...")
             analyzer.generate_performance_report()
     
     except KeyboardInterrupt:
-        print("\n\n⏹️  Benchmark interrupted by user")
+        print("\n\nBenchmark interrupted by user")
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\nError: {e}")
         traceback.print_exc()
 
 if __name__ == "__main__":

@@ -2,3 +2,5 @@ pixdraft
 *.egg-info/
 help
 target
+__pycache__
+performance.db
