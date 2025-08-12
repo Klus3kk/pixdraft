@@ -1,3 +1,4 @@
 pixdraft 
 *.egg-info/
 help
+target
