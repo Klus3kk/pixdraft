@@ -1,6 +1,5 @@
-#!/usr/bin/env python3
 """
-Simple GUI demo for PixTrick
+GUI demo for PixTrick
 Demonstrates Rust engine integration with PySide6
 """
 
@@ -234,7 +233,7 @@ class PixTrickMainWindow(QMainWindow):
         # Status
         self.status_label = QLabel("Ready")
         if not ENGINE_AVAILABLE:
-            self.status_label.setText("⚠️ Rust engine not available. Run: cd src/engine && maturin develop")
+            self.status_label.setText("Rust engine not available. Run: cd src/engine && maturin develop")
             self.status_label.setStyleSheet("color: red;")
         
         left_layout.addWidget(file_group)
